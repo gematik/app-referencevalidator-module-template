@@ -18,15 +18,15 @@
     <description>MODULE_DESCRIPTION</description>
 
     <scm>
-        <url>https://github.com/gematik/app-referencevalidator-valmodule-erp</url>
-        <connection>scm:git:git://github.com/gematik/app-referencevalidator-valmodule-erp.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com:gematik/app-referencevalidator-valmodule-erp.git
+        <url>https://github.com/gematik/app-referencevalidator-valmodule-MODULE-NAME</url>
+        <connection>scm:git:git://github.com/gematik/app-referencevalidator-valmodule-MODULE-NAME.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:gematik/app-referencevalidator-valmodule-MODULE-NAME.git
         </developerConnection>
     </scm>
 
     <issueManagement>
         <system>GitHub</system>
-        <url>https://github.com/gematik/app-referencevalidator-valmodule-erp/issues</url>
+        <url>https://github.com/gematik/app-referencevalidator-valmodule-MODULE-NAME/issues</url>
     </issueManagement>
 
     <organization>
