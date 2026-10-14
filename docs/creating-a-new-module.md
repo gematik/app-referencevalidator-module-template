@@ -450,7 +450,7 @@ packageGroups:
       - "hl7.terminology.r4-7.1.0.tgz"
 ```
 
-### 5.3 Approach B: Registry coordinates (isik5, isik6)
+### 5.3 Approach B: Registry coordinates
 
 A `src-package` folder is not required. Reference the FHIR IG by its **FHIR package coordinate** `id#version`. Leave `sourcePackagesPath` out of `snapshot.config.yaml`. If you have custom patches, define them and point the configuration of `patchesPath` to the folder containing the patches.
 
