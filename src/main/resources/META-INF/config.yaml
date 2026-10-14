@@ -1,0 +1,68 @@
+configSpecVersion: '3.0'
+name: MODULE_NAME
+author: 'gematik GmbH'
+description: 'MODULE_DESCRIPTION'
+version: 'MODULE_VERSION'
+errorOnUnknownProfile: "true"
+anyExtensionsAllowed: "false"
+ignoredCodeSystems:
+#  - "http://snomed.info/sct" 
+ignoredValueSets:
+#  - "http://hl7.org/fhir/uv/ips/ValueSet/medicine-doseform" 
+globalSuppressionRules:
+#  - ruleId: "RULE-ID"
+#    messagePattern: ".*does not match any known slice.*meta.profile.*"
+#    reason: "Known transition issue for multiple meta.profile entries"
+
+# ============================================================================
+# TEMPLATES: Reusable validation message transformation blocks
+# ============================================================================
+messageTransformTemplates:
+#  meta_profile_slice_to_error:
+#    - severityLevelFrom: "information"
+#      severityLevelTo: "error"
+#      locatorString: "does not match any known slice"
+#      messageLocationRegex: "meta.profile"
+#    - severityLevelFrom: "information"
+#      severityLevelTo: "error"
+#      locatorString: "stimmt mit keinem bekannten Slice"
+#      messageLocationRegex: "meta.profile"
+
+# ============================================================================
+# DEPENDENCY LISTS: Components with packages and validity periods
+# ============================================================================
+dependencyLists:
+  dependency-id:
+    packages:
+    # As Bundle in `src-package`
+    #  - "de.gematik.erezept-workflow.r4-1.1.1.tgz"
+    #  - "gematik.kbv.sfhir.cs.vs-1.0.0.tgz" # Update!
+    #  - "kbv.ita.erp-1.0.2.tgz"
+    #  - "kbv.ita.for-1.0.3.tgz"
+    #  - "kbv.basis-1.1.3.tgz"
+    #  - "de.basisprofil.r4-0.9.13.tgz"
+    # As Remote
+    #  - MODULE_NAME#1.0.0
+    #messageTransforms: ["meta_profile_slice_to_error"]
+    #validFrom: "2022-07-01"
+    #validTill: "2023-03-31"
+
+# ============================================================================
+# PROFILE GROUPS: Denormalized mapping structure for O(1) lookups
+# ============================================================================
+profileGroups:
+  group-id:
+    baseUrl: "https://gematik.de/fhir/StructureDefinition"
+    versionBindings:
+    #  1.0.3:
+    #    dependencyLists: ["dependency-id"]
+    profiles:
+      #DAV-PR-ERP-Abgabeinformationen:
+      #  creationDateLocator: "whenHandedOver"
+      #DAV-PR-ERP-AbgabedatenBundle:
+      #  creationDateLocator: "Bundle.entry.resource.where(meta.profile.contains('DAV-PR-ERP-Abgabeinformationen')).whenHandedOver"
+      #DAV-PR-ERP-AbgabedatenComposition: {}
+      #DAV-PR-ERP-Abrechnungszeilen: {}
+      #DAV-PR-ERP-Apotheke: {}
+      #DAV-PR-ERP-ZusatzdatenEinheit: {}
+      #DAV-PR-ERP-ZusatzdatenHerstellung: {}
