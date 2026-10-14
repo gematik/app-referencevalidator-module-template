@@ -1,8 +1,35 @@
+# =============================================================================
+# Reference Validator Plugin Configuration — Spec Version 3.0
+#
+# TERMINOLOGY
+# -----------
+#   packageGroup    A named, immutable set of FHIR packages that are ALWAYS
+#                   loaded together. Contains no dates and no references to
+#                   other groups — what you read is exactly what gets loaded.
+#
+#   profileFamily   A set of FHIR profiles sharing the same canonical base URL
+#                   and the same release cycle (e.g. all KBV e-prescription
+#                   profiles).
+#
+#   version         A supported profile version (as found after the "|" in a
+#                   canonical, e.g. "https://fhir.kbv.de/...|1.0.2"). Each
+#                   version declares WHICH packageGroup is active WHEN.
+#
+#   validityPeriods A list of entries binding a packageGroup to an explicit
+#                   date range [validFrom, validTill]. An entry WITHOUT
+#                   validTill is open-ended: it is the currently active group
+#                   and serves as the fallback when no reference date can be
+#                   determined. At most ONE open-ended entry per version.
+#
+#   validityDateSource
+#                   A FHIRPath expression evaluated against the resource to
+#                   extract the reference date (formerly creationDateLocator).
 configSpecVersion: '3.0'
 name: MODULE_NAME
 author: 'gematik GmbH'
 description: 'MODULE_DESCRIPTION'
 version: 'MODULE_VERSION'
+specUrl: 'YOUR_SPEC_URL'
 errorOnUnknownProfile: "true"
 anyExtensionsAllowed: "false"
 ignoredCodeSystems:
@@ -14,25 +41,28 @@ globalSuppressionRules:
 #    messagePattern: ".*does not match any known slice.*meta.profile.*"
 #    reason: "Known transition issue for multiple meta.profile entries"
 
-# ============================================================================
-# TEMPLATES: Reusable validation message transformation blocks
-# ============================================================================
-messageTransformTemplates:
-#  meta_profile_slice_to_error:
-#    - severityLevelFrom: "information"
-#      severityLevelTo: "error"
-#      locatorString: "does not match any known slice"
-#      messageLocationRegex: "meta.profile"
-#    - severityLevelFrom: "information"
-#      severityLevelTo: "error"
-#      locatorString: "stimmt mit keinem bekannten Slice"
-#      messageLocationRegex: "meta.profile"
+# =============================================================================
+# MESSAGE TRANSFORMATIONS: reusable severity-rewrite rules,
+# referenced by name from packageGroups
+# =============================================================================
+messageTransformations:
+#  ignore_terminology_server_errors:
+#    - severityLevelFrom: "error"
+#      severityLevelTo: "information"
+#      messageLocationRegex: ".*"
+#      messageId: "Error_validating_code_running_without_terminology_services"
+#
+#  ignore_match_multiple_slices:
+#    - severityLevelFrom: "error"
+#      severityLevelTo: "information"
+#      messageLocationRegex: ".*IEEE11073.*"
+#      messageId: "Validation_VAL_Profile_MatchMultiple"
 
 # ============================================================================
-# DEPENDENCY LISTS: Components with packages and validity periods
+# packageGroups: Components with packages and validity periods
 # ============================================================================
-dependencyLists:
-  dependency-id:
+packageGroups:
+  YOUR_PACKAGE_GROUP_ID:
     packages:
     # As Bundle in `src-package`
     #  - "de.gematik.erezept-workflow.r4-1.1.1.tgz"
@@ -43,26 +73,33 @@ dependencyLists:
     #  - "de.basisprofil.r4-0.9.13.tgz"
     # As Remote
     #  - MODULE_NAME#1.0.0
-    #messageTransforms: ["meta_profile_slice_to_error"]
-    #validFrom: "2022-07-01"
-    #validTill: "2023-03-31"
+    #messageTransformations: ["ignore_match_multiple_slices"]
 
-# ============================================================================
-# PROFILE GROUPS: Denormalized mapping structure for O(1) lookups
-# ============================================================================
-profileGroups:
+# =============================================================================
+# PROFILE FAMILIES: the runtime lookup structure.
+# A family answers: "given profile URL + version + date, which packageGroup?"
+#
+# Per version:
+#   validityPeriods : ordered list; FIRST period containing the reference
+#                     date wins (overlaps allowed, order = priority).
+#                     The single OPEN-ENDED entry (no validTill) is the
+#                     currently active group and is used when no reference
+#                     date can be determined. If all entries are closed,
+#                     a missing date is a validation error.
+# Per family:
+#   defaultVersion  : used when the canonical carries no "|version".
+# =============================================================================
+profileFamilies:
   group-id:
-    baseUrl: "https://gematik.de/fhir/StructureDefinition"
-    versionBindings:
-    #  1.0.3:
-    #    dependencyLists: ["dependency-id"]
-    profiles:
-      #DAV-PR-ERP-Abgabeinformationen:
-      #  creationDateLocator: "whenHandedOver"
-      #DAV-PR-ERP-AbgabedatenBundle:
-      #  creationDateLocator: "Bundle.entry.resource.where(meta.profile.contains('DAV-PR-ERP-Abgabeinformationen')).whenHandedOver"
-      #DAV-PR-ERP-AbgabedatenComposition: {}
-      #DAV-PR-ERP-Abrechnungszeilen: {}
-      #DAV-PR-ERP-Apotheke: {}
-      #DAV-PR-ERP-ZusatzdatenEinheit: {}
-      #DAV-PR-ERP-ZusatzdatenHerstellung: {}
+    canonicalBase: "YOUR_CANONICAL_BASE"
+    defaultVersion: "YOUR_VERSION"
+    versions:
+      "YOUR_VERSION":
+        validityPeriods:
+          - packageGroup: YOUR_PACKAGE_GROUP_ID
+            # validFrom: YOUR_VALID_FROM_DATE # Optional
+            # validTill: YOUR_VALID_TILL_DATE # Optional
+    # Optional additional configuration for this profile group
+    # profiles:
+    #  DAV-PR-ERP-Abgabeinformationen:
+    #    validityDateSource: "whenHandedOver"
