@@ -239,9 +239,21 @@ Keep these values identical:
 
 ### 4.3 Module Manifest 
 
-The Manifest must be defined in [`META-INF/config.yaml`](../src/main/resources/META-INF/config.yaml).
+The Manifest must be defined in [`META-INF/config.yaml`](../src/main/resources/META-INF/config.yaml). The template ships this file with placeholders (`MODULE_NAME`, `MODULE_DESCRIPTION`, `MODULE_VERSION`, `YOUR_SPEC_URL`, `YOUR_PACKAGE_GROUP_ID`, `YOUR_CANONICAL_BASE`, `YOUR_VERSION`). Replace all of them.
 
-At the time of writing, the current specification for the Manifest is `3.0`, so it is defined as property `configSpecVersion: '3.0'`. 
+At the time of writing, the current specification for the Manifest is `3.0`, so it is defined as property `configSpecVersion: '3.0'`.
+
+#### Terminology
+
+| Term                 | Meaning |
+| -------------------- | ------- |
+| `packageGroup`       | A named, immutable set of FHIR packages that are **always loaded together**. It contains no dates and no references to other groups: what you read is exactly what gets loaded. |
+| `profileFamily`      | A set of FHIR profiles that share the same canonical base URL and the same release cycle (e.g. all KBV e-prescription profiles). |
+| `version`            | A supported profile version, as found after the `\|` in a canonical (e.g. `https://fhir.kbv.de/...\|1.0.2`). Each version declares **which** package group is active **when**. |
+| validity period      | An entry in a version's `groups` list that binds a package group to a date range `[validFrom, validTill]`. An entry **without** `validTill` is open-ended: it is the currently active group and the fallback when no reference date can be determined. |
+| `validityDateSource` | A FHIRPath expression evaluated against the resource to extract the reference date (formerly `creationDateLocator`). |
+
+#### Example
 
 A typical Manifest can look like this:
 
@@ -250,7 +262,7 @@ configSpecVersion: '3.0'
 name: myig                          # must equal getName()
 author: 'My Organisation'
 description: 'Reference Validator Module for MyIG'
-version: '3.0'
+version: '1.0'
 specUrl: 'https://simplifier.net/packages/my.ig'
 
 # These properties override the ones defined in the YAML file used for the validation
@@ -283,7 +295,7 @@ messageTransformations:
       locatorString: "does not match any known slice"
       messageLocationRegex: "meta.profile"
 
-# A package group is a self-contained set of packages for validating one IG version
+# Named, immutable sets of packages that are always loaded together (no dates here)
 packageGroups:
   my.ig.1.0.0:
     packages:
@@ -293,33 +305,63 @@ packageGroups:
       # Registry strategy: FHIR package coordinate "id#version" - requires internet access
       # - "my.ig#1.0.0"
     messageTransformations: [ "ignore_terminology_server_errors" ]
+  my.ig.1.0.1:
+    packages:
+      - "my.ig-1.0.1.tgz"
+      - "de.basisprofil.r4-1.5.2.tgz"
+    messageTransformations: [ "ignore_terminology_server_errors" ]
 
-# Maps profile canonicals and versions to package groups
+# Runtime lookup: "given profile URL + version + date, which packageGroup?"
 profileFamilies:
   myig:
     canonicalBase: "https://example.org/fhir/StructureDefinition"
-    defaultVersion: "1.0"
+    defaultVersion: "1.0"                       # used when the canonical carries no "|version"
+    versions:
+      "1.0":
+        groups:                                 # validity periods: first match wins
+          - packageGroupName: my.ig.1.0.0
+            validFrom: "2026-01-01"
+            validTill: "2026-06-30"
+          - packageGroupName: my.ig.1.0.1       # open-ended: currently active + fallback
+            validFrom: "2026-07-01"
+    profiles:                                   # optional, per-profile settings
+      MyBundle:
+        # FHIRPath that extracts the reference date, per profile version
+        validityDateSourceByVersion:
+          "1.0": "Bundle.entry.resource.where(meta.profile.contains('MyComposition')).date"
+      MyComposition:
+        validityDateSource: "date"              # same FHIRPath for all versions
+      MyPatient: {}
+```
+
+The simplest version declares a single open-ended entry without any dates:
+
+```yaml
     versions:
       "1.0":
         groups:
           - packageGroupName: my.ig.1.0.0
-            validFrom: "2026-01-01"          # optional; enables validity-period checks
-    profiles:
-      MyBundle:
-        # FHIRPath that gives the date checked against validFrom
-        validityDateSourceByVersion:
-          "1.0": "Bundle.entry.resource.where(meta.profile.contains('MyComposition')).date"
-      MyComposition:
-        validityDateSource: "date"
-      MyPatient: {}
 ```
 
-How a resource is resolved:
+> **Note on key names:** the comments in the template `config.yaml` call the per-version list `validityPeriods` and its reference field `packageGroup`. The manifest model in `validation-module-api` 3.0.0 (`ProfileVersion`, `PackageGroupReference`) reads the keys **`groups`** and **`packageGroupName`**. Use these keys, as the eau, erp, and isik modules do.
+
+#### How a resource is resolved
 
 1. The validator reads `meta.profile` from the resource.
 2. It finds the profile family whose `canonicalBase` matches. The `|version` suffix, or `defaultVersion` if the suffix is missing, selects the version.
-3. That version gives one or more package groups. When several groups exist (as in erp), the group whose `validFrom` matches the date from `validityDateSource` is chosen.
-4. The resource is validated against the snapshots of that package group only. Then the message transformations and suppression rules are applied.
+3. The reference date is extracted from the resource with `validityDateSourceByVersion[<version>]`, or else `validityDateSource`, of the matching profile.
+4. The validity periods of that version are checked **in order**. The **first** period whose `[validFrom, validTill]` range contains the reference date wins. Overlaps are allowed, and the list order is the priority.
+5. If no reference date can be determined, the single **open-ended** period (without `validTill`) is used. If all periods are closed, a missing date is a validation error.
+6. The resource is validated against the snapshots of the selected package group only. Then the group's message transformations and the global suppression rules are applied.
+
+#### Consistency rules
+
+The manifest is checked when it is loaded:
+
+- Every version must declare **at least one** validity period block, dates are optional.
+- Every version may declare **at most one** open-ended period (without `validTill`).
+- Every `packageGroupName` must reference an existing entry in `packageGroups`.
+- Every name listed in a package group's `messageTransformations` must exist in the top-level `messageTransformations`.
 
 ### 4.4 `snapshot.config.yaml` (build time)
 
@@ -381,7 +423,7 @@ context:
     exampleUrlsUsagePolicy: "DISALLOWED"
     exampleRestReferencesPolicy: "DISALLOWED"
     recursiveModePolicy: "DISALLOWED"
-    anyExtensionPolicy: "DISALLOWED"                # Overriden through the Module Manifest
+    anyExtensionPolicy: "DISALLOWED"                # overridden by anyExtensionsAllowed in the Module Manifest
 module:
   directory: "./target"                             # where the built module JAR is located
   name: "myig"
@@ -399,7 +441,7 @@ report:
 
 ### 4.6 Build
 
-You need to the following prerequisites: 
+You need the following prerequisites:
 
 * JDK 25+
 * Maven 3.9+
@@ -419,7 +461,7 @@ in case of success, it will result in the generated JAR file located at `target/
 
 ## 5. Managing FHIR packages
 
-There are two approaches in this workspace. In both, the result in the JAR is the same: snapshotted `.tgz` files under `package/`. The approaches differ in where the **source** packages come from and how much control you have over them.
+There are two approaches. In both, the result in the JAR is the same: snapshotted `.tgz` files under `package/`. The approaches differ in where the **source** packages come from and how much control you have over them.
 
 ### 5.1 Patching
 
@@ -552,7 +594,7 @@ You can define your own Tests, with the help of JUnit, inside the project, by us
 | ---------------------------------- | ------------------------------------------ | ----------------------------------- |
 | Effort                             | Zero code: just drop files                 | Java test code required             |
 | Tests the shipped JAR              | Yes                                        | Uses the module on the classpath    |
-| Negative tests (expected failures) | Not distinguished: the report shows errors | Yes (`valid/` vs `invalid/`)        |
+| Negative tests (expected failures) | Not distinguished: the report shows errors | Yes, e.g. by folder convention (`valid/` vs `invalid/`) |
 | Message-level assertions           | No                                         | Yes                                 |
 | Output                             | HTML report                                | JUnit / Surefire reports            |
 
@@ -584,7 +626,8 @@ module:
 - [ ] The SPI class and `META-INF/services/...FhirValidationModule` are registered.
 - [ ] The name is identical in `getName()`, `config.yaml` → `name`, and `validator.config.yaml` → `module.name`.
 - [ ] `packageGroups` are complete. With Approach A, every dependency is listed explicitly.
-- [ ] `profileFamilies` cover all profiles. `validFrom` and `validityDateSource` are set where versions overlap.
+- [ ] All template placeholders (`MODULE_NAME`, `YOUR_PACKAGE_GROUP_ID`, `YOUR_CANONICAL_BASE`, …) are replaced.
+- [ ] `profileFamilies` cover all profiles. Each version has at least one validity period and at most one open-ended period. `validityDateSource` is set where several periods exist.
 - [ ] Code systems that cannot be validated offline are listed in `ignoredCodeSystems` / `ignoredValueSets` and documented in the README.
 - [ ] Every patch has a `changes.txt` entry.
 - [ ] `target/snapshot-report.html` has been reviewed.
