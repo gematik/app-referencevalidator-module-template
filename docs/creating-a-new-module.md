@@ -461,7 +461,7 @@ packageGroups:
       - "de.gematik.isik#6.0.0"
 ```
 
-During `generate-snapshot`, the CLI downloads the package and **all transitive dependencies** from the registry into `target/cache-snapshot-fhir-packages/`. For `de.gematik.isik#6.0.0`, this produced about 27 packages. They include `de.basisprofil.r4`, `de.medizininformatikinitiative.kerndatensatz.*`, `dvmd.kdl.r4`, `hl7.terminology.r4` (several versions), `hl7.fhir.uv.extensions.r4`, `hl7.fhir.uv.sdc`, and `hl7.fhir.uv.subscriptions-backport.r4`. All of them are snapshotted and packaged.
+During `generate-snapshot`, the CLI downloads the package and **all transitive dependencies** from the registry into `target/cache-snapshot-fhir-packages/`. 
 
 ### 5.4 Pros and cons
 
