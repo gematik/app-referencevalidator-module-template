@@ -5,7 +5,7 @@
 A validation module is a small JAR that contains:
 
 1. **A Java SPI class** that gives the module its name (`FhirValidationModule`).
-2. **A module manifest** (`META-INF/config.yaml`) that lists package groups, profile families, versions, optional validity periods, and validation rules.
+2. **A module manifest** (`META-INF/config.yaml`) that lists package groups, profile families, versions with their optional validity dates, and validation rules.
 3. **Pre-snapshotted FHIR packages** (`package/*.tgz`). The build process generates them automatically, based on the module manifest definitions.
 
 The Reference Validator finds modules with the Java `ServiceLoader`. It reads the manifest and loads the packaged FHIR packages **offline**. No registry or terminology server is needed at validation time.
@@ -250,7 +250,7 @@ At the time of writing, the current specification for the Manifest is `3.0`, so 
 | `packageGroup`       | A named, immutable set of FHIR packages that are **always loaded together**. It contains no dates and no references to other groups: what you read is exactly what gets loaded. |
 | `profileFamily`      | A set of FHIR profiles that share the same canonical base URL and the same release cycle (e.g. all KBV e-prescription profiles). |
 | `version`            | A supported profile version, as found after the `\|` in a canonical (e.g. `https://fhir.kbv.de/...\|1.0.2`). Each version declares **which** package group is active **when**. |
-| validity period      | An entry in a version's `groups` list that binds a package group to a date range `[validFrom, validTill]`. An entry **without** `validTill` is open-ended: it is the currently active group and the fallback when no reference date can be determined. |
+| `groups`             | A list of entries binding a package group **by name** (`packageGroupName`) to an explicit date range `[validFrom, validTill]`. An entry **without** `validTill` is open-ended: it is the currently active group and serves as the fallback when no reference date can be determined. At most **one** open-ended entry per version. |
 | `validityDateSource` | A FHIRPath expression evaluated against the resource to extract the reference date (formerly `creationDateLocator`). |
 
 #### Example
@@ -282,12 +282,11 @@ globalSuppressionRules:
     messagePattern: ".*__sorted.*"
     reason: "Sort-order warnings not actionable"
 
-# Optional, these modify the issue severity level for some messages
+# Optional, reusable severity-rewrite rules, referenced by name from packageGroups
 messageTransformations:
   ignore_terminology_server_errors:
     - severityLevelFrom: "error"
       severityLevelTo: "information"
-      messageLocationRegex: ".*"
       messageId: "Error_validating_code_running_without_terminology_services"
   meta_profile_slice_to_error:
     - severityLevelFrom: "information"
@@ -318,13 +317,13 @@ profileFamilies:
     defaultVersion: "1.0"                       # used when the canonical carries no "|version"
     versions:
       "1.0":
-        groups:                                 # validity periods: first match wins
+        groups:                                 # ordered list: first entry containing the reference date wins
           - packageGroupName: my.ig.1.0.0
             validFrom: "2026-01-01"
             validTill: "2026-06-30"
           - packageGroupName: my.ig.1.0.1       # open-ended: currently active + fallback
             validFrom: "2026-07-01"
-    profiles:                                   # optional, per-profile settings
+    profiles:                                   # optional, additional configuration per profile
       MyBundle:
         # FHIRPath that extracts the reference date, per profile version
         validityDateSourceByVersion:
@@ -334,7 +333,7 @@ profileFamilies:
       MyPatient: {}
 ```
 
-The simplest version declares a single open-ended entry without any dates:
+The simplest version declares a single open-ended entry in `groups` without any dates (`validFrom` and `validTill` are optional):
 
 ```yaml
     versions:
@@ -343,23 +342,21 @@ The simplest version declares a single open-ended entry without any dates:
           - packageGroupName: my.ig.1.0.0
 ```
 
-> **Note on key names:** the comments in the template `config.yaml` call the per-version list `validityPeriods` and its reference field `packageGroup`. The manifest model in `validation-module-api` 3.0.0 (`ProfileVersion`, `PackageGroupReference`) reads the keys **`groups`** and **`packageGroupName`**. Use these keys, as the eau, erp, and isik modules do.
-
 #### How a resource is resolved
 
 1. The validator reads `meta.profile` from the resource.
 2. It finds the profile family whose `canonicalBase` matches. The `|version` suffix, or `defaultVersion` if the suffix is missing, selects the version.
 3. The reference date is extracted from the resource with `validityDateSourceByVersion[<version>]`, or else `validityDateSource`, of the matching profile.
-4. The validity periods of that version are checked **in order**. The **first** period whose `[validFrom, validTill]` range contains the reference date wins. Overlaps are allowed, and the list order is the priority.
-5. If no reference date can be determined, the single **open-ended** period (without `validTill`) is used. If all periods are closed, a missing date is a validation error.
+4. The `groups` entries of that version are checked **in order**. The **first** entry whose `[validFrom, validTill]` range contains the reference date wins. Overlaps are allowed, and the list order is the priority.
+5. If no reference date can be determined, the single **open-ended** entry (without `validTill`) is used. If all entries are closed, a missing date is a validation error.
 6. The resource is validated against the snapshots of the selected package group only. Then the group's message transformations and the global suppression rules are applied.
 
 #### Consistency rules
 
 The manifest is checked when it is loaded:
 
-- Every version must declare **at least one** validity period block, dates are optional.
-- Every version may declare **at most one** open-ended period (without `validTill`).
+- Every version must declare **at least one** entry in `groups`. The dates are optional.
+- Every version may declare **at most one** open-ended entry (without `validTill`).
 - Every `packageGroupName` must reference an existing entry in `packageGroups`.
 - Every name listed in a package group's `messageTransformations` must exist in the top-level `messageTransformations`.
 
@@ -431,7 +428,7 @@ validationOptions:
   profileToValidate: null                           # force a single profile
   profileFilterRegex: null                          # restrict which meta.profile entries are used
   validationMessagesFilterStrategy: "KEEP_ALL"
-  profileValidityPeriodCheckStrategy: "VALIDATE"    # enforce validFrom / validityDateSource
+  profileValidityPeriodCheckStrategy: "VALIDATE"    # enforce validFrom / validTill of the groups entries
   messageTransformations: []
   suppressionRules: []
 report:
@@ -579,7 +576,7 @@ ReferenceValidator validate --config=validator.config.yaml src/test/resources/fh
 - The Module is loaded from `module.directory: ./target` by `module.name`, through the `ServiceLoader`. This uses the produced JAR file, just as end users do.
 - `remoteDownloadPolicy: DISALLOWED` makes sure that the JAR contains every package it needs. A missing package shows up here, not in production.
 - Every file under `src/test/resources/fhir/` (recursively, XML or JSON) is validated against the profile in its `meta.profile`.
-- `profileValidityPeriodCheckStrategy: VALIDATE` also checks `validFrom` and `validityDateSource`.
+- `profileValidityPeriodCheckStrategy: VALIDATE` also checks the reference date (from `validityDateSource`) against the `validFrom` / `validTill` of the `groups` entries.
 - Results are written to `target/validation-report.html`.
 
 You can define the test resources with different layouts, such as `fhir/<ProfileName>/<example>.xml` or `fhir/<ProfileName>/<IG-version>/valid/<example>.xml` or `fhir/<ResourceType>-<id>.json`: the Validator will be able to pick up the files recursively.
@@ -627,7 +624,7 @@ module:
 - [ ] The name is identical in `getName()`, `config.yaml` → `name`, and `validator.config.yaml` → `module.name`.
 - [ ] `packageGroups` are complete. With Approach A, every dependency is listed explicitly.
 - [ ] All template placeholders (`MODULE_NAME`, `YOUR_PACKAGE_GROUP_ID`, `YOUR_CANONICAL_BASE`, …) are replaced.
-- [ ] `profileFamilies` cover all profiles. Each version has at least one validity period and at most one open-ended period. `validityDateSource` is set where several periods exist.
+- [ ] `profileFamilies` cover all profiles. Each version has at least one entry in `groups` and at most one open-ended entry. `validityDateSource` is set where a version has several entries.
 - [ ] Code systems that cannot be validated offline are listed in `ignoredCodeSystems` / `ignoredValueSets` and documented in the README.
 - [ ] Every patch has a `changes.txt` entry.
 - [ ] `target/snapshot-report.html` has been reviewed.
