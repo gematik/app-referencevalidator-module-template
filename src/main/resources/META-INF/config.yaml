@@ -15,7 +15,7 @@
 #                   canonical, e.g. "https://fhir.kbv.de/...|1.0.2"). Each
 #                   version declares WHICH packageGroup is active WHEN.
 #
-#   validityPeriods A list of entries binding a packageGroup to an explicit
+#   groups          A list of entries binding a packageGroup by name to an explicit
 #                   date range [validFrom, validTill]. An entry WITHOUT
 #                   validTill is open-ended: it is the currently active group
 #                   and serves as the fallback when no reference date can be
@@ -49,14 +49,17 @@ messageTransformations:
 #  ignore_terminology_server_errors:
 #    - severityLevelFrom: "error"
 #      severityLevelTo: "information"
-#      messageLocationRegex: ".*"
 #      messageId: "Error_validating_code_running_without_terminology_services"
 #
 #  ignore_match_multiple_slices:
 #    - severityLevelFrom: "error"
 #      severityLevelTo: "information"
-#      messageLocationRegex: ".*IEEE11073.*"
+#      messageLocationRegex: ".*YOURPATTERN.*"
 #      messageId: "Validation_VAL_Profile_MatchMultiple"
+#    - severityLevelFrom: "error"
+#          severityLevelTo: "information"
+#          locatorString: "you-string"
+#          messageId: "Reference_REF_CantMatchChoice"
 
 # ============================================================================
 # packageGroups: Components with packages and validity periods
@@ -80,7 +83,7 @@ packageGroups:
 # A family answers: "given profile URL + version + date, which packageGroup?"
 #
 # Per version:
-#   validityPeriods : ordered list; FIRST period containing the reference
+#   groups:           ordered list; FIRST period containing the reference
 #                     date wins (overlaps allowed, order = priority).
 #                     The single OPEN-ENDED entry (no validTill) is the
 #                     currently active group and is used when no reference
@@ -95,11 +98,11 @@ profileFamilies:
     defaultVersion: "YOUR_VERSION"
     versions:
       "YOUR_VERSION":
-        validityPeriods:
-          - packageGroup: YOUR_PACKAGE_GROUP_ID
+        groups:
+          - packageGroupName: YOUR_PACKAGE_GROUP_ID
             # validFrom: YOUR_VALID_FROM_DATE # Optional
             # validTill: YOUR_VALID_TILL_DATE # Optional
     # Optional additional configuration for this profile group
     # profiles:
-    #  DAV-PR-ERP-Abgabeinformationen:
-    #    validityDateSource: "whenHandedOver"
+    #  YOUR_PROFILE:
+    #    validityDateSource: "FHIRPATHExpressionHere"
