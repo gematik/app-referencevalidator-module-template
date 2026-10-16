@@ -26,7 +26,7 @@ package de.gematik.refv.valmodule;
 
 import de.gematik.refv.valmodule.api.boundary.FhirValidationModule;
 
-/** Definition of the e-Rezept Validation Module */
+/** Definition of the MODULE_NAME Validation Module */
 public class MyIgValidationModule implements FhirValidationModule {
   @Override
   public String getName() {
