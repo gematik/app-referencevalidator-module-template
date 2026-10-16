@@ -41,4 +41,5 @@ build/
 jenkinsfile.*
 .githubignore
 tools
-
+.jenkins
+.provisioning-metadata.json

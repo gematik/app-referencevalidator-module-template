@@ -28,7 +28,7 @@ configSpecVersion: '3.0'
 name: MODULE_NAME
 author: 'gematik GmbH'
 description: 'MODULE_DESCRIPTION'
-version: 'MODULE_VERSION'
+version: '${project.version}' # follows the maven version
 specUrl: 'YOUR_SPEC_URL'
 errorOnUnknownProfile: "true"
 anyExtensionsAllowed: "false"
